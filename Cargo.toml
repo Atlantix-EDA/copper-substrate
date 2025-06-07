@@ -1,0 +1,13 @@
+[package]
+name = "copper-substrate"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.41"
+egui = "0.31.1"
+egui_lens = "0.1.0"
+egui_mobius = "0.3.0-alpha.31"
+egui_mobius_reactive = "0.3.0-alpha.31"
+local-ip = "0.1.0"
+uuid = { version = "1.11", features = ["v4"] }
