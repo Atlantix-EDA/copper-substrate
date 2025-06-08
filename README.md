@@ -175,7 +175,7 @@ This project is in its conceptual phase and welcomes contributions that explore 
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+GPL License. 
 
 ---
 
