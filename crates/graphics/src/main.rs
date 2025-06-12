@@ -1,4 +1,3 @@
-
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release builds.
 
 /// Copper-Graphics Engine
@@ -26,6 +25,7 @@
 use std::sync::Arc;
 
 use eframe::{egui, egui::mutex::Mutex, egui_glow, egui_glow::glow};
+use copper_graphics::presets;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init();
@@ -50,10 +50,16 @@ struct CuGraphicsApp {
 }
 
 impl CuGraphicsApp {
-    pub fn new(cc : &eframe::CreationContext<'_>) -> Self {
-        let gl = cc.gl.as_ref().expect("You need to run eframe with the glow backend!");
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let gl = cc
+            .gl
+            .as_ref()
+            .expect("three-d can only be run with the glow backend");
+
+        let custom_3d = Arc::new(Mutex::new(Custom3d::new(gl)));
+
         Self {
-            custom_3d: Arc::new(Mutex::new(Custom3d::new(gl))),
+            custom_3d,
             angle: 0.0,
             tilt: 0.0,
             zoom: 1.0,
@@ -63,32 +69,63 @@ impl CuGraphicsApp {
 
 impl eframe::App for CuGraphicsApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-                ui.label("The triangle is being painted using ");
-                ui.hyperlink_to("three-d", "https://github.com/asny/three-d");
-                ui.label(", a 3D rendering library for Rust.")
-            });
+        egui::SidePanel::left("side_panel").show(ctx, |ui| {
+            ui.heading("View Controls");
+            
+            ui.add(egui::Slider::new(&mut self.angle, -180.0..=180.0).text("Rotation"));
+            ui.add(egui::Slider::new(&mut self.tilt, -90.0..=90.0).text("Tilt"));
+            ui.add(egui::Slider::new(&mut self.zoom, 0.1..=3.0).text("Zoom"));
+            
+            if ui.button("Reset View").clicked() {
+                self.angle = 0.0;
+                self.tilt = 0.0;
+                self.zoom = 1.0;
+            }
+            
+            ui.separator();
+            
+            ui.heading("PCB Stack-up");
+            ui.label("4-Layer Board");
+            ui.label("• Top Solder Mask");
+            ui.label("• Top Copper (Signal)");
+            ui.label("• Prepreg");
+            ui.label("• Inner Layer 1 (GND)");
+            ui.label("• Core (FR4)");
+            ui.label("• Inner Layer 2 (PWR)");
+            ui.label("• Prepreg");
+            ui.label("• Bottom Copper (Signal)");
+            ui.label("• Bottom Solder Mask");
+            
+            ui.separator();
+            
+            ui.label("Powered by:");
+            ui.hyperlink("https://github.com/emilk/egui");
+            ui.hyperlink("https://github.com/asny/three-d");
+        });
 
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("3D PCB Stackup Visualization");
+            
+            // Create the frame for the 3D scene
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                self.custom_painting(ui);
+                self.custom_3d_glow_painter(ui);
             });
-            ui.label("Drag horizontally to rotate, vertically to tilt! Scroll to zoom!");
         });
     }
 }
 
 impl CuGraphicsApp {
-    fn custom_painting(&mut self, ui: &mut egui::Ui) {
-        let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(1024.0), egui::Sense::drag());
+    fn custom_3d_glow_painter(&mut self, ui: &mut egui::Ui) {
+        use egui_glow::CallbackFn;
+        
+        let (rect, response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
 
         // Handle drag for rotation and tilt
         self.angle += response.drag_delta().x * 0.01;
         self.tilt += response.drag_delta().y * 0.01;
         
         // Clamp tilt to prevent flipping
-        self.tilt = self.tilt.clamp(-1.5, 1.5);
+        self.tilt = self.tilt.clamp(-89.0, 89.0);
 
         // Handle scroll wheel for zooming
         if response.hovered() {
@@ -96,21 +133,24 @@ impl CuGraphicsApp {
             if scroll_delta != 0.0 {
                 // Zoom in/out with scroll wheel
                 self.zoom *= 1.0 + scroll_delta * 0.01;
-                self.zoom = self.zoom.clamp(0.3, 5.0); // Limit zoom range to prevent clipping
+                self.zoom = self.zoom.clamp(0.1, 3.0);
             }
         }
 
         let angle = self.angle;
         let tilt = self.tilt;
         let zoom = self.zoom;
+        
         let custom_3d = self.custom_3d.clone();
+        let callback = CallbackFn::new(move |info, _painter| {
+            custom_3d.lock().paint(&info, angle, tilt, zoom);
+        });
 
         let callback = egui::PaintCallback {
             rect,
-            callback: Arc::new(egui_glow::CallbackFn::new(move |info, _painter| {
-                custom_3d.lock().paint(&info, angle, tilt, zoom);
-            })),
+            callback: Arc::new(callback),
         };
+
         ui.painter().add(callback);
     }
 }
@@ -122,142 +162,26 @@ impl CuGraphicsApp {
 struct Custom3d {
     three_d: three_d::Context,
     camera: three_d::Camera,
-    layers: Vec<three_d::Gm<three_d::Mesh, three_d::PhysicalMaterial>>,
+    stack_renderer: copper_graphics::PcbStackRenderer,
     ambient_light: three_d::AmbientLight,
     light0: three_d::DirectionalLight,
     light1: three_d::DirectionalLight,
 }
 
 impl Custom3d {
-    fn create_material(three_d: &three_d::Context, albedo: three_d::Srgba, roughness: f32, metallic: f32) -> three_d::PhysicalMaterial {
-        use three_d::*;
-        let mut material = PhysicalMaterial::new_opaque(
-            three_d,
-            &CpuMaterial {
-                albedo,
-                roughness,
-                metallic,
-                ..Default::default()
-            },
-        );
-        material.render_states.cull = Cull::Back;
-        material
-    }
-    
-    fn create_transparent_material(three_d: &three_d::Context, albedo: three_d::Srgba, roughness: f32, metallic: f32) -> three_d::PhysicalMaterial {
-        use three_d::*;
-        let mut material = PhysicalMaterial::new_transparent(
-            three_d,
-            &CpuMaterial {
-                albedo,
-                roughness,
-                metallic,
-                ..Default::default()
-            },
-        );
-        material.render_states.cull = Cull::Back;
-        material.render_states.blend = Blend::TRANSPARENCY;
-        material
-    }
-
-    fn create_pcb_layer(three_d: &three_d::Context, width: f32, height: f32, thickness: f32, y_pos: f32, material: three_d::PhysicalMaterial) -> three_d::Gm<three_d::Mesh, three_d::PhysicalMaterial> {
-        use three_d::*;
-        
-        let positions = vec![
-            vec3(-width/2.0, y_pos - thickness/2.0, -height/2.0),
-            vec3( width/2.0, y_pos - thickness/2.0, -height/2.0),
-            vec3( width/2.0, y_pos + thickness/2.0, -height/2.0),
-            vec3(-width/2.0, y_pos + thickness/2.0, -height/2.0),
-            vec3(-width/2.0, y_pos - thickness/2.0,  height/2.0),
-            vec3( width/2.0, y_pos - thickness/2.0,  height/2.0),
-            vec3( width/2.0, y_pos + thickness/2.0,  height/2.0),
-            vec3(-width/2.0, y_pos + thickness/2.0,  height/2.0),
-        ];
-        
-        let indices = vec![
-            0, 1, 2, 0, 2, 3,  // Back
-            5, 4, 7, 5, 7, 6,  // Front
-            4, 0, 3, 4, 3, 7,  // Left
-            1, 5, 6, 1, 6, 2,  // Right
-            3, 2, 6, 3, 6, 7,  // Top
-            4, 5, 1, 4, 1, 0,  // Bottom
-        ];
-        
-        let mut cpu_mesh = CpuMesh {
-            positions: Positions::F32(positions),
-            indices: Indices::U32(indices),
-            ..Default::default()
-        };
-        cpu_mesh.compute_normals();
-        
-        Gm::new(Mesh::new(three_d, &cpu_mesh), material)
-    }
-
     fn new(gl: &Arc<glow::Context>) -> Self {
         use three_d::*;
 
-        let three_d = Context::from_gl_context(gl.clone()).unwrap();
-
-        let pcb_width = 50.0;
-        let pcb_height = 40.0;
-        let copper_thickness = 0.3;     // Make copper layers even thicker for visibility
-        let prepreg_thickness = 0.5;    // Make prepreg thicker
-        let core_thickness = 1.0;       // Make core thicker
+        // Create three-d context
+        let three_d = three_d::Context::from_gl_context(gl.clone()).unwrap();
         
-        let mut layers = Vec::new();
-        // Calculate total thickness including solder mask
-        let soldermask_thickness = copper_thickness * 0.5;
-        let total_thickness = (soldermask_thickness * 2.0) + (copper_thickness * 4.0) + (prepreg_thickness * 2.0) + core_thickness;
-        let mut y_pos = -total_thickness / 2.0; // Start from bottom
-        
-        // Build stackup from bottom to top
-        
-        // Bottom solder mask (semi-transparent)
-        let bottom_soldermask = Self::create_transparent_material(&three_d, Srgba::new(0, 100, 50, 200), 0.4, 0.0);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, soldermask_thickness, y_pos, bottom_soldermask));
-        y_pos += soldermask_thickness;
-        
-        // Bottom copper (transparent)
-        let bottom_copper = Self::create_transparent_material(&three_d, Srgba::new(255, 180, 120, 180), 0.15, 0.98);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, copper_thickness, y_pos, bottom_copper));
-        y_pos += copper_thickness;
-        
-        // Prepreg 1
-        let prepreg1 = Self::create_material(&three_d, Srgba::new(90, 90, 85, 255), 0.95, 0.0);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, prepreg_thickness, y_pos, prepreg1));
-        y_pos += prepreg_thickness;
-        
-        // Inner layer 1 (ground plane - transparent)
-        let inner1_copper = Self::create_transparent_material(&three_d, Srgba::new(255, 140, 50, 160), 0.2, 0.85);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, copper_thickness, y_pos, inner1_copper));
-        y_pos += copper_thickness;
-        
-        // Core (FR4)
-        let core = Self::create_material(&three_d, Srgba::new(80, 80, 75, 255), 0.95, 0.0);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, core_thickness, y_pos, core));
-        y_pos += core_thickness;
-        
-        // Inner layer 2 (power plane - transparent)
-        let inner2_copper = Self::create_transparent_material(&three_d, Srgba::new(255, 140, 50, 160), 0.2, 0.85);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, copper_thickness, y_pos, inner2_copper));
-        y_pos += copper_thickness;
-        
-        // Prepreg 2
-        let prepreg2 = Self::create_material(&three_d, Srgba::new(100, 100, 95, 255), 0.9, 0.0);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, prepreg_thickness, y_pos, prepreg2));
-        y_pos += prepreg_thickness;
-        
-        // Top copper (transparent)
-        let top_copper = Self::create_transparent_material(&three_d, Srgba::new(255, 180, 120, 180), 0.15, 0.98);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, copper_thickness, y_pos, top_copper));
-        y_pos += copper_thickness;
-        
-        // Top solder mask (semi-transparent)
-        let top_soldermask = Self::create_transparent_material(&three_d, Srgba::new(0, 100, 50, 200), 0.4, 0.0);
-        layers.push(Self::create_pcb_layer(&three_d, pcb_width, pcb_height, soldermask_thickness, y_pos, top_soldermask));
+        // Create a standard 4-layer PCB stack
+        let mut stack_renderer = presets::standard_4_layer_stack();
+        stack_renderer.center_stack(); // Center the stack around Y=0
+        stack_renderer.build_stack(&three_d);
 
         Self {
-            three_d: three_d::Context::from_gl_context(gl.clone()).unwrap(),
+            three_d: three_d.clone(),
             camera: Camera::new_perspective(
                 Viewport {
                     x: 0,
@@ -272,7 +196,7 @@ impl Custom3d {
                 0.01,
                 1000.0,
             ),
-            layers,
+            stack_renderer,
             ambient_light: AmbientLight::new(&three_d, 0.7, Srgba::WHITE),
             light0: DirectionalLight::new(&three_d, 0.8, Srgba::WHITE, &vec3(0.0, -0.5, -0.5)),
             light1: DirectionalLight::new(&three_d, 0.8, Srgba::WHITE, &vec3(0.0, 0.5, 0.5)),
@@ -306,7 +230,7 @@ impl Custom3d {
 
         // Set transformation for all layers (combine rotation and tilt)
         let transformation = Mat4::from_angle_y(radians(angle)) * Mat4::from_angle_x(radians(tilt));
-        for layer in &mut self.layers {
+        for layer in self.stack_renderer.rendered_layers_mut() {
             layer.set_transformation(transformation);
         }
 
@@ -323,7 +247,7 @@ impl Custom3d {
         screen.render_partially(
             viewport.into(),
             &self.camera,
-            self.layers.iter(),
+            self.stack_renderer.rendered_layers().iter(),
             &[&self.ambient_light, &self.light0, &self.light1]
         );
     }
