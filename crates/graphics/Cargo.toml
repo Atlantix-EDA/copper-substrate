@@ -1,0 +1,12 @@
+[package]
+name = "copper-graphics"
+version = "0.1.0"
+edition = "2021"
+
+# Empty workspace table to exclude from parent workspace
+[workspace]
+
+[dependencies]
+eframe = { version = "0.23.0", features = ["glow"] }
+env_logger = "0.10.0"
+three-d = "0.16.2"

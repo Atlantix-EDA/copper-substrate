@@ -1,6 +1,6 @@
 use uuid::Uuid;
-use crate::substrate::layer_type::LayerType;
-use crate::substrate::board_interface::{Rectangle, GraphicElement, GraphicType, Stroke, StrokeType};
+use crate::layer_type::LayerType;
+use crate::board_interface::{Rectangle, GraphicElement, GraphicType, Stroke, StrokeType};
 
 /// Courtyard structure
 #[derive(Debug, Clone)]

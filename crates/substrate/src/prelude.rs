@@ -1,4 +1,4 @@
-pub use crate::substrate::{
+pub use crate::{
     board_interface::*,
     courtyard::Courtyard,
     functional_types::FunctionalType,

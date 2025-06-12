@@ -1,4 +1,5 @@
 use copper_substrate::prelude::*;
+use copper_exporters::*;
 use uuid::Uuid;
 
 struct SMTResistor0805 {
@@ -150,7 +151,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     
     // Generate the footprint
-    let footprint_content = resistor.to_kicad_footprint();
+    let footprint_content = copper_exporters::to_kicad_footprint(&resistor);
     
     // Write to file
     std::fs::write("R_0805_2012Metric.kicad_mod", footprint_content)?;

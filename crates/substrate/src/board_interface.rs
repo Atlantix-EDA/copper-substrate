@@ -11,9 +11,9 @@
 //! KiCad footprints, bounding boxes, pad descriptors, and other properties necessary for PCB design.
 //! 
 use std::collections::HashMap;
-use crate::substrate::layer_type::LayerType;
-use crate::substrate::courtyard::Courtyard;
-use crate::substrate::functional_types::FunctionalType;
+use crate::layer_type::LayerType;
+use crate::courtyard::Courtyard;
+use crate::functional_types::FunctionalType;
 pub trait BoardComposableObject {
     // Basic 
     fn is_smt(&self) -> bool;
@@ -230,11 +230,7 @@ pub trait KiCadExportable {
     fn to_kicad_footprint(&self) -> String;
 }
 
-impl<T: BoardComposableObject> KiCadExportable for T {
-    fn to_kicad_footprint(&self) -> String {
-        crate::exporters::kicad_pcb_export::to_kicad_footprint(self)
-    }
-}
+// Implementation moved to copper-exporters crate to avoid circular dependency
 
 /// Rendering traits (unchanged from original)
 pub trait ComponentRenderer {

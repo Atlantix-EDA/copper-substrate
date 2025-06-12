@@ -1,5 +1,5 @@
 use std::fmt::Write;
-use crate::substrate::board_interface::*;
+use copper_substrate::prelude::*;
 
 
 /// Helper functions for KiCad output formatting

@@ -1,4 +1,5 @@
 use copper_substrate::prelude::*;
+use copper_exporters::*;
 use uuid::Uuid;
 
 struct SMTCapacitor0805 {
@@ -210,7 +211,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     
     // Generate the footprint
-    let footprint_content = cap.to_kicad_footprint();
+    let footprint_content = copper_exporters::to_kicad_footprint(&cap);
     
     // Write to file
     std::fs::write("C_0402_1005Metric.kicad_mod", footprint_content)?;
