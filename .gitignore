@@ -18,6 +18,7 @@ Cargo.lock
 *.kicad_mod
 *.kicad_pcb
 *.kicad_sch
+*.mod
 *.bak
 
 # IDE files

@@ -1,5 +1,4 @@
 use copper_substrate::prelude::*;
-use copper_exporters::*;
 use uuid::Uuid;
 
 struct SMTCapacitor0805 {

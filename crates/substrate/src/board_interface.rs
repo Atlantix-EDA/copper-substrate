@@ -237,12 +237,6 @@ pub trait ComponentRenderer {
     fn render(&self, component: &dyn BoardComposableObject, ctx: &mut egui::Painter);
 }
 
-struct SMTResistorRenderer;
-impl ComponentRenderer for SMTResistorRenderer {
-    fn render(&self, _component: &dyn BoardComposableObject, _ctx: &mut egui::Painter) {
-        // Specialized rendering for SMT resistors
-    }
-}
 
 pub trait LayerAware {
     fn copper_layers(&self) -> Vec<CopperLayer>;

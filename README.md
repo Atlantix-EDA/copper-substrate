@@ -4,16 +4,19 @@
 ## Imagining a New Era PCB Engine 
 
 
-[![MSRV](https://img.shields.io/badge/MSRV-1.65.0-blue)](https://blog.rust-lang.org/2022/11/03/Rust-1.65.0.html)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/Version-0.1.0-green.svg)](https://github.com/Atlantix-EDA/copper-substrate)
+[![Author](https://img.shields.io/badge/Author-Atlantix%20EDA-blue.svg)](https://github.com/Atlantix-EDA)
+[![egui](https://img.shields.io/badge/GUI-egui-orange.svg)](https://github.com/emilk/egui)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85.0-blue)](https://blog.rust-lang.org/2024/12/05/Rust-1.85.0.html)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 </div>
 
-A forward-looking Printed Circuit Board Electronic Design Automation Engine built on a polymorphic, trait-based architecture in Rust. 
+A forward-looking Printed Circuit Board Electronic Design Automation Engine built on a polymorphic, trait-based architecture in Rust with a coordinated goal of foundational architecture supporting 3D based design. 
 
 ## Overview
 
-copper-substrate is a conceptual framework for a new generation PCB design engine that leverages Rust's powerful trait system to create a polymorphic approach to PCB component modeling. Unlike traditional PCB tools that rely on rigid hierarchies or format-specific representations, copper-substrate introduces the concept of a "Board Composable Object" - a universal interface that any PCB element can implement.
+copper-substrate is a conceptual framework for a new generation PCB design engine that leverages Rust's powerful trait system to create a polymorphic approach to PCB component modeling. Unlike traditional PCB tools that rely on rigid hierarchies or format-specific representations, copper-substrate introduces the concept of a "Board Composable Object" - a universal interface that any PCB element can implement. Another way to view the Board Composable Object is as a **Hardware Atom** - a base *atomic unit* that is configurable via traits whether it be electrical or mechanical in nature. 
 
 With the introduction of various Rust based tools in the EDA space, there is a tangible momentum where construction of an entirely new
 PCB engine is possible. Some of these tools include the entire gamut
@@ -27,7 +30,7 @@ While there have been similar attempts in the past at a more behavioral approach
 the implementation of such ideas. While a language such as Python or 
 C++ could have been chosen, Rust was selected for its performant and 
 thread safe memory operations, while having a growing ecosystem
-of EDA tools. 
+of EDA tools. The 3D graphics engines available in the Rust ecosystem afford the developer the ease of making an application that is primarily and root centered on the 3D design space while still providing the necessary aspects of the 2D design paradigm. 
 
 ## Getting Started
 The crate has yet been published to `crates.io` so for initial evaluation
@@ -35,12 +38,16 @@ one should pull the crate and run the examples. Right now the main supported
 backend is `KiCad`. 
 
 
-To run the examples:
+To run the 3d engine:
 
 ```bash
-  git clone git@github.com:saturn77/copper-substrate.git 
-  cd copper-substrate
+  git clone git@github.com:Atlantix-EDA/copper-substrate.git 
+  cd crates/graphics
+  cargo run
+```
 
+To run the examples (using copper-substrate)
+```bash
   cargo run --example capacitor
   cargo run --example resistor
 ```
@@ -117,19 +124,35 @@ let footprint = cap.to_kicad_footprint();
 
 ```
 copper-substrate/
-├── src/
-│   ├── lib.rs                 # Public API and re-exports
-│   ├── substrate/             # Core framework
-│   │   ├── board_interface.rs # The BoardComposableObject trait
-│   │   ├── functional_types.rs # Component taxonomy
-│   │   ├── package_types.rs   # Physical packaging definitions
-│   │   ├── layer_type.rs      # PCB layer system
-│   │   └── courtyard.rs       # Automatic courtyard generation
-│   └── exporters/             # Format-specific exporters
-│       └── kicad_pcb_export.rs # KiCad format implementation
+├── Cargo.toml                # Workspace configuration
+├── LICENSE                   # GPL v3 license
+├── README.md                 # This file
+├── assets/                   # Project assets
+│   ├── Copper-Substrate.png
+│   └── Copper-Substrate-2.png
+├── crates/                   # Multi-crate workspace
+│   ├── substrate/            # Core substrate framework
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs                 # Public API and re-exports
+│   │       ├── board_interface.rs     # The BoardComposableObject trait
+│   │       ├── functional_types.rs    # Component taxonomy
+│   │       ├── package_types.rs       # Physical packaging definitions
+│   │       ├── layer_type.rs          # PCB layer system
+│   │       ├── courtyard.rs           # Automatic courtyard generation
+│   │       └── prelude.rs             # Convenience re-exports
+│   ├── exporters/            # Format-specific exporters
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       └── kicad_pcb_export.rs    # KiCad format implementation
+│   └── graphics/             # 3D visualization with egui
+│       ├── Cargo.toml
+│       └── src/
+│           └── main.rs                # 3D PCB viewer application
 └── examples/
-    ├── capacitor.rs           # Example capacitor implementation
-    └── resistor.rs            # Example resistor implementation
+    ├── capacitor.rs          # Example capacitor implementation
+    └── resistor.rs           # Example resistor implementation
 ```
 
 ## Design Philosophy
@@ -175,7 +198,7 @@ This project is in its conceptual phase and welcomes contributions that explore 
 
 ## License
 
-GPL License. 
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details. 
 
 ---
 
